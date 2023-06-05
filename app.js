@@ -67,7 +67,7 @@ app.get("/todos/", async (request, response) => {
     FROM
       todo
     WHERE
-    todo='${search_q}';`;
+    todo LIKE '%${search_q}%';`;
     const todosArray = await db.all(getTodosQuery);
     response.send(todosArray);
   }
@@ -101,30 +101,44 @@ app.post("/todos/", async (request, response) => {
 
 //UPDATE TODO API
 app.put("/todos/:todoId/", async (request, response) => {
-  const { status, priority, todo } = request.body;
+  const requestBody = request.body;
   const { todoId } = request.params;
-  if (status !== undefined) {
-    const updateStatusQuery = `UPDATE todo 
-        SET 
-        status='${status}'
-        WHERE id='${todoId}';`;
-    await db.run(updateStatusQuery);
-    response.send("Status Updated");
-  } else if (priority !== undefined) {
-    const updatePriorityQuery = `UPDATE todo 
-        SET 
-        status='${status}'
-        WHERE id='${todoId}';`;
-    await db.run(updatePriorityQuery);
-    response.send("Priority Updated");
-  } else if (todo !== undefined) {
-    const updateTodoQuery = `UPDATE todo 
-        SET 
-        todo='${todo}'
-        WHERE id='${todoId}';`;
-    await db.run(updateTodoQuery);
-    response.send("Todo Updated");
+  let updateColumn = "";
+  switch (true) {
+    case requestBody.status !== undefined:
+      updateColumn = "Status";
+      break;
+
+    case requestBody.priority !== undefined:
+      updateColumn = "Priority";
+      break;
+    case requestBody.todo !== undefined:
+      updateColumn = "Todo";
+      break;
   }
+
+  const prevTodoQuery = `SELECT 
+  * FROM
+  todo
+  WHERE todo='${todoId}';`;
+
+  const prevTodo = await db.get(prevTodoQuery);
+
+  const {
+    todo = prevTodo.todo,
+    status = prevTodo.status,
+    priority = prevTodo.priority,
+  } = request.body;
+
+  const updatedTodoQuery = `UPDATE todo
+  SET 
+  todo='${todo}',
+ priority='${priority}',
+  status='${status}'
+  WHERE id='${todoId}';`;
+
+  const data = await db.run(updatedTodoQuery);
+  response.send(`${updatedColumn} Updated`);
 });
 
 //DELETE TODO API
@@ -132,7 +146,7 @@ app.delete("/todos/:todoId/", async (request, response) => {
   const { todoId } = request.params;
   deleteTodoQuery = `DELETE FROM todo
     WHERE id='${todoId}';`;
-  db.run(deleteTodoQuery);
+  await db.run(deleteTodoQuery);
   response.send("Todo Deleted");
 });
 module.exports = app;
